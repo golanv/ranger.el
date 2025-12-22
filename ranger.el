@@ -5,7 +5,7 @@
 ;; Version: 0.9.8.6
 ;; Keywords: files, convenience, dired
 ;; Homepage: https://github.com/ralesi/ranger
-;; Package-Requires: ((emacs "24.4"))
+;; Package-Requires: ((emacs "27.1"))
 
 ;; Inspired by work from
 ;; peep-dired - Author: Adam Sokolnicki
@@ -289,6 +289,14 @@ preview window."
 
 (defcustom ranger-hide-cursor t
   "When non-nil, hide cursor in dired buffers."
+  :group 'ranger
+  :type 'boolean)
+
+(defcustom ranger-use-hydra nil
+  "When non-nil, use hydra menus for ranger commands if hydra is available.
+This provides a more intuitive and discoverable interface for
+common ranger commands like navigation (g), sorting (o), and
+toggles (z). Requires the hydra package to be installed."
   :group 'ranger
   :type 'boolean)
 
@@ -917,10 +925,12 @@ to not replace existing value."
 
     ;; allow cursor to be cleared
     (when ranger-hide-cursor
-      (defadvice evil-refresh-cursor (around evil activate)
-        (unless (or (eq major-mode 'ranger-mode)
-                    (memq (current-buffer) ranger-parent-buffers))
-          ad-do-it))))
+      (advice-add 'evil-refresh-cursor :around
+                  (lambda (orig-fun &rest args)
+                    (unless (or (eq major-mode 'ranger-mode)
+                                (memq (current-buffer) ranger-parent-buffers))
+                      (apply orig-fun args)))
+                  '((name . ranger-evil-cursor-advice)))))
 
   ;; make sure isearch is cleared before we delete the buffer on exit
   (add-hook 'ranger-mode-hook '(lambda () (setq isearch--current-buffer nil))))
@@ -937,21 +947,31 @@ to not replace existing value."
     (evil-normalize-keymaps)))
 
 ;; wdired integration
-(eval-after-load 'wdired
-  '(progn
-     (defadvice wdired-change-to-wdired-mode (before evil activate)
-       (setq ranger-was-ranger (eq major-mode 'ranger-mode))
-       (when ranger-was-ranger
-         (ranger-to-dired)))
-     (defadvice wdired-exit (after evil activate)
-       (when ranger-was-ranger
-         (ranger-mode)))
-     (defadvice wdired-abort-changes (after evil activate)
-       (when ranger-was-ranger
-         (ranger-mode)))
-     (defadvice wdired-finish-edit (after evil activate)
-       (when ranger-was-ranger
-         (ranger-mode)))))
+(with-eval-after-load 'wdired
+  (advice-add 'wdired-change-to-wdired-mode :before
+              (lambda (&rest _args)
+                (setq ranger-was-ranger (eq major-mode 'ranger-mode))
+                (when ranger-was-ranger
+                  (ranger-to-dired)))
+              '((name . ranger-wdired-before)))
+  
+  (advice-add 'wdired-exit :after
+              (lambda (&rest _args)
+                (when ranger-was-ranger
+                  (ranger-mode)))
+              '((name . ranger-wdired-exit)))
+  
+  (advice-add 'wdired-abort-changes :after
+              (lambda (&rest _args)
+                (when ranger-was-ranger
+                  (ranger-mode)))
+              '((name . ranger-wdired-abort)))
+  
+  (advice-add 'wdired-finish-edit :after
+              (lambda (&rest _args)
+                (when ranger-was-ranger
+                  (ranger-mode)))
+              '((name . ranger-wdired-finish))))
 
 
 
@@ -3173,6 +3193,98 @@ properly provides the modeline in dired mode. "
   (add-hook 'window-configuration-change-hook 'ranger-window-check)
   (setq-local mouse-1-click-follows-link nil)
   )
+
+;;; Optional Hydra integration
+;;
+;; Ranger provides optional hydra menus for common command groups
+;; when the hydra package is available and `ranger-use-hydra' is enabled.
+;; These hydra menus can be called directly or via wrapper functions.
+
+(defun ranger--hydra-available-p ()
+  "Check if hydra is available and enabled."
+  (and ranger-use-hydra (require 'hydra nil t)))
+
+;; Define hydra menus when hydra is available
+(with-eval-after-load 'hydra
+  (defhydra ranger-hydra-go (:color blue :hint nil)
+    "
+^Navigate^          ^Special^           ^Tabs^
+^^^^^^^^-----------------------------------------------------------------
+_h_: ~/             _e_: /etc           _n_: new tab
+_/_,_r_: /          _u_: /usr           _t_: next tab
+_d_: /dev           _o_: /opt           _T_: prev tab
+_v_: /var           _s_: /srv           _c_: close tab
+_m_: /media         _R_: ranger.el loc  _g_: goto top
+_M_: /mnt           _l_: follow dir     _j_: next subdir
+_D_: dotfiles       _L_: follow file    _k_: prev subdir
+_q_: quit
+"
+    ("h" (ranger-find-file "~/"))
+    ("/" (ranger-find-file "/"))
+    ("r" (ranger-find-file "/"))
+    ("e" (ranger-find-file "/etc"))
+    ("u" (ranger-find-file "/usr"))
+    ("d" (ranger-find-file "/dev"))
+    ("o" (ranger-find-file "/opt"))
+    ("v" (ranger-find-file "/var"))
+    ("m" (ranger-find-file "/media"))
+    ("M" (ranger-find-file "/mnt"))
+    ("s" (ranger-find-file "/srv"))
+    ("R" (ranger-find-file (file-truename (file-name-directory (find-library-name "ranger.el")))))
+    ("l" (ranger-find-file (file-truename default-directory)))
+    ("L" (ranger-find-file (file-truename (dired-get-filename))))
+    ("j" ranger-next-subdir)
+    ("k" ranger-prev-subdir)
+    ("n" ranger-new-tab)
+    ("t" ranger-next-tab)
+    ("T" ranger-prev-tab)
+    ("c" ranger-close-tab)
+    ("g" ranger-goto-top)
+    ("D" ranger-toggle-dotfiles)
+    ("q" nil))
+
+  (defhydra ranger-hydra-sort (:color blue :hint nil)
+    "
+^Sort By^           ^Order^
+^^^^^^^^-----------------------------------------------------------------
+_n_: name           _N_: name (reverse)
+_e_: extension      _E_: extension (reverse)
+_s_: size           _S_: size (reverse)
+_t_: modified time  _T_: modified time (reverse)
+_c_: created time   _C_: created time (reverse)
+_q_: quit
+"
+    ("n" (ranger-sort-criteria ?n))
+    ("N" (ranger-sort-criteria ?N))
+    ("e" (ranger-sort-criteria ?e))
+    ("E" (ranger-sort-criteria ?E))
+    ("s" (ranger-sort-criteria ?s))
+    ("S" (ranger-sort-criteria ?S))
+    ("t" (ranger-sort-criteria ?t))
+    ("T" (ranger-sort-criteria ?T))
+    ("c" (ranger-sort-criteria ?c))
+    ("C" (ranger-sort-criteria ?C))
+    ("q" nil))
+
+  (defhydra ranger-hydra-settings (:color amaranth :hint nil)
+    "
+^Toggle^            ^Preview^           ^Parents^          ^Other^
+^^^^^^^^-----------------------------------------------------------------
+_h_: hidden files   _i_: literal        _+_: more parents  _z_: history
+_d_: dirs first     _f_: fit images     _-_: less parents
+_P_: deer mode      _p_: details
+_q_: quit
+"
+    ("h" ranger-toggle-dotfiles)
+    ("d" ranger-toggle-dir-first)
+    ("P" ranger-minimal-toggle :color blue)
+    ("i" ranger-toggle-literal)
+    ("f" ranger-toggle-scale-images)
+    ("p" ranger-toggle-details)
+    ("+" ranger-more-parents)
+    ("-" ranger-less-parents)
+    ("z" ranger-show-history :color blue)
+    ("q" nil :color blue)))
 
 (provide 'ranger)
 
