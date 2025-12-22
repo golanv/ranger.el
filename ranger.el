@@ -955,19 +955,19 @@ to not replace existing value."
                 (when ranger-was-ranger
                   (ranger-to-dired)))
               '((name . ranger-wdired-before)))
-  
+
   (advice-add 'wdired-exit :after
               (lambda (&rest _args)
                 (when ranger-was-ranger
                   (ranger-mode)))
               '((name . ranger-wdired-exit)))
-  
+
   (advice-add 'wdired-abort-changes :after
               (lambda (&rest _args)
                 (when ranger-was-ranger
                   (ranger-mode)))
               '((name . ranger-wdired-abort)))
-  
+
   (advice-add 'wdired-finish-edit :after
               (lambda (&rest _args)
                 (when ranger-was-ranger
@@ -3231,9 +3231,13 @@ _q_: quit
     ("m" (ranger-find-file "/media"))
     ("M" (ranger-find-file "/mnt"))
     ("s" (ranger-find-file "/srv"))
-    ("R" (ranger-find-file (file-truename (file-name-directory (find-library-name "ranger.el")))))
+    ("R" (condition-case nil
+             (ranger-find-file (file-truename (file-name-directory (find-library-name "ranger.el"))))
+           (error (message "Could not locate ranger.el library"))))
     ("l" (ranger-find-file (file-truename default-directory)))
-    ("L" (ranger-find-file (file-truename (dired-get-filename))))
+    ("L" (condition-case nil
+             (ranger-find-file (file-truename (dired-get-filename)))
+           (error (message "No file selected or invalid file entry"))))
     ("j" ranger-next-subdir)
     ("k" ranger-prev-subdir)
     ("n" ranger-new-tab)
