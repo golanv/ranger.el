@@ -3291,6 +3291,24 @@ _q_: quit
     ("z" ranger-show-history :color blue)
     ("q" nil :color blue)))
 
+;; Setup function to remap keys when hydra is enabled
+;; This function is defined outside with-eval-after-load so it's always available
+(defun ranger--setup-hydra-keys ()
+  "Remap g and o keys to use hydra menus when hydra is enabled.
+This function is called from ranger-mode-hook to conditionally
+remap keys when ranger-use-hydra is t and hydra package is loaded."
+  (when (ranger--hydra-available-p)
+    ;; Only remap if the hydra functions are actually defined
+    (when (fboundp 'ranger-hydra-go/body)
+      ;; Remap 'g' to use hydra navigation menu
+      (define-key ranger-mode-map "g" #'ranger-hydra-go/body))
+    (when (fboundp 'ranger-hydra-sort/body)
+      ;; Remap 'o' to use hydra sort menu
+      (define-key ranger-mode-map "o" #'ranger-hydra-sort/body))))
+
+;; Add hook to setup hydra key bindings when ranger-mode is activated
+(add-hook 'ranger-mode-hook #'ranger--setup-hydra-keys)
+
 (provide 'ranger)
 
 ;;; ranger.el ends here

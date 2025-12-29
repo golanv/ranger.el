@@ -453,13 +453,13 @@ support, install the hydra package and set:
 (setq ranger-use-hydra t)
 ```
 
-When enabled, three hydra menus are available:
+When enabled, the `g` and `o` keys are automatically remapped to use hydra menus:
 
-- **Navigation Menu (`ranger-hydra-go/body`)** - Quick access to common
+- **`g` - Navigation Menu (`ranger-hydra-go/body`)** - Quick access to common
   directories, tabs, and navigation commands. Shows the same options as the
   built-in "g" menu but with a persistent visual guide.
 
-- **Sort Menu (`ranger-hydra-sort/body`)** - Sort files by name, extension,
+- **`o` - Sort Menu (`ranger-hydra-sort/body`)** - Sort files by name, extension,
   size, or modification time, in ascending or descending order. Provides the
   same functionality as the "o" sort menu.
 
@@ -467,13 +467,12 @@ When enabled, three hydra menus are available:
   settings like hidden files, directory-first sorting, literal preview, image
   scaling, and parent window count. Groups the various "z" prefix commands.
 
-You can call these hydra menus directly with `M-x ranger-hydra-go/body`,
-`M-x ranger-hydra-sort/body`, or `M-x ranger-hydra-settings/body`, or bind them
-to your preferred keys.
+The settings menu can be called directly with `M-x ranger-hydra-settings/body`
+or bound to your preferred key.
 
 **Note:** Hydra menus are completely optional. All ranger functionality works
-without hydra installed. The hydra integration is provided as a convenience for
-users who prefer a visual, discoverable interface.
+without hydra installed. When `ranger-use-hydra` is `nil` (the default), the
+original `g` and `o` key bindings remain unchanged.
 
 ### Buffer Management
 
