@@ -86,6 +86,9 @@
 (require 'subr-x)
 (require 'diminish nil t)
 
+(eval-and-compile
+  (require 'hydra))
+
 (defgroup ranger ()
   "Modify dired to act like ranger."
   :group 'ranger
